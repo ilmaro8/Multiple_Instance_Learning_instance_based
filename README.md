@@ -13,9 +13,11 @@ Python==3.6.9, albumentations==0.1.8, numpy==1.17.3, opencv==4.2.0, pandas==0.25
 - The best models for the Multiple Instance Learning CNN is available [here](https://drive.google.com/drive/folders/1jLWLRzIYTphFW-ywyODa7yozyWtQviJP).
 
 ## Datasets
+### Private datasets
 Two private datasets are used for training the CNNs:
 - AOEC
-- Radboudc
+- Radboudumc
+### Publicly available datasets: 
 Six publicly available datasets are used for testing the CNNs:
 - [GlaS](https://warwick.ac.uk/fac/cross_fac/tia/data/glascontest/)
 - [CRC](https://warwick.ac.uk/fac/cross_fac/tia/data/crc_grading/) 
