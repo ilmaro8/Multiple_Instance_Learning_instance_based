@@ -30,6 +30,11 @@ Six publicly available datasets are used for testing the CNNs:
 The WSIs are split in 224x224 pixels patches, from magnification 10x. 
 The methods used to extract the patches come from [Multi_Scale_Tools library](https://github.com/sara-nl/multi-scale-tools)
 
+The method is in the /preprocessing folder of the Multi_Scale_Tools library: 
+- python Patch_Extractor_Dense_Grid.py -m 10 -w 1.25 -p 10 -r True -s 224 -x 0.7 -y 0 -i /PATH/CSV/IMAGES/TO/EXTRACT.csv -t /PATH/TISSUE/MASKS/TO/USE/ -o /FOLDER/WHERE/TO/STORE/THE/PATCHES/
+
+More info: https://www.frontiersin.org/articles/10.3389/fcomp.2021.684521/full
+
 ## CSV Input Files:
 CSV files are used as input for the scripts. The csvs have the following structures
 - For each partition (train, validation, test), the csv file has id_img, cancer, high-grade dysplasia, low-grade dysplasia, hyperplastic polyp, normal glands as column.
