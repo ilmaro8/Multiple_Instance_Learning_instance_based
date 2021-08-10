@@ -7,7 +7,7 @@ If you find this repository useful in your research, please cite: ...
 Paper link: 
 
 ## Requirements
-Python==3.6.9, albumentations==0.1.8, numpy==1.17.3, opencv==4.2.0, pandas==0.25.2, pillow==6.1.0, torchvision==0.3.0, pytorch==1.1.0
+Python==3.6.9, albumentations==0.1.8, numpy==1.17.3, opencv==4.2.0, pandas==0.25.2, pillow==6.1.0, torchvision==0.8.1, pytorch==1.7.0
 
 ## Best models
 - The best models for the Multiple Instance Learning CNN is available [here](https://drive.google.com/drive/folders/1jLWLRzIYTphFW-ywyODa7yozyWtQviJP).
