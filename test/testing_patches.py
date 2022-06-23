@@ -151,7 +151,10 @@ class MIL_model(torch.nn.Module):
 				torch.nn.Tanh(),
 				torch.nn.Linear(self.D, self.K)
 			)
-	
+
+		self.tanh = torch.nn.Tanh()
+		self.relu = torch.nn.ReLU()
+
 	def forward(self, x, conv_layers_out):
 		"""
 		In the forward function we accept a Tensor of input data and we must return
@@ -164,7 +167,8 @@ class MIL_model(torch.nn.Module):
 		m_binary = torch.nn.Sigmoid()
 		m_multiclass = torch.nn.Softmax()
 		dropout = torch.nn.Dropout(p=0.2)
-
+		
+		
 		if x is not None:
 			#print(x.shape)
 			conv_layers_out=self.conv_layers(x)
@@ -180,8 +184,13 @@ class MIL_model(torch.nn.Module):
 		#print(conv_layers_out.shape)
 
 		if (EMBEDDING_bool==True):
+			#conv_layers_out = self.tanh(conv_layers_out)
 			embedding_layer = self.embedding(conv_layers_out)
+			#embedding_layer = self.tanh(embedding_layer)
+			embedding_layer = self.relu(embedding_layer)
 			features_to_return = embedding_layer
+
+			#embedding_layer = self.tanh(embedding_layer)
 
 			embedding_layer = dropout(embedding_layer)
 			logits = self.embedding_fc(embedding_layer)
@@ -189,47 +198,30 @@ class MIL_model(torch.nn.Module):
 		else:
 			logits = self.fc(conv_layers_out)
 			features_to_return = conv_layers_out
-
 		#print(output_fcn.shape)
-		if (TASK=='binary'):
-			output_fcn = m_binary(logits)
-		else:
-			output_fcn = m_multiclass(logits)
+		
 
-		output_fcn = torch.clamp(output_fcn, 1e-7, 1 - 1e-7)
 		#print(output_fcn.size())
 
-		if (pool_algorithm=='max'):
-			output_pool = output_fcn.max(dim = 0)[0]
-		elif (pool_algorithm=='avg'):
-			output_pool = output_fcn.mean(dim = 0)
-			#print(output_pool.size())
-		elif (pool_algorithm=='lin'):
-			output_pool = (output_fcn * output_fcn).sum(dim = 0) / output_fcn.sum(dim = 0)
-			#print(output_pool.size())
-		elif (pool_algorithm=='exp'):
-			output_pool = (output_fcn * output_fcn.exp()).sum(dim = 0) / output_fcn.exp().sum(dim = 0)
-			#print(output_pool.size())
-		elif (pool_algorithm=='att'):
+		if (EMBEDDING_bool==True):
+			A = self.attention(features_to_return)
+		else:
+			A = self.attention(conv_layers_out)  # NxK
+			
+		#print(A.size())
+		#print(A)
+		A = F.softmax(A, dim=0)  # softmax over N
+		#print(A.size())
+		#print(A)
+		#A = A.view(-1, A.size()[0])
+		#print(A)
 
-			if (EMBEDDING_bool==True):
-				A = self.attention(features_to_return)
-			else:
-				A = self.attention(conv_layers_out)  # NxK
-				
-			#print(A.size())
-			#print(A)
-			A = F.softmax(A, dim=0)  # softmax over N
-			#print(A.size())
-			#print(A)
-			#A = A.view(-1, A.size()[0])
-			#print(A)
+		output_pool = (logits * A).sum(dim = 0) #/ (A).sum(dim = 0)
+		#print(output_pool.size())
+		#print(output_pool)
+		#output_pool = torch.clamp(output_pool, 1e-7, 1 - 1e-7)
 
-			output_pool = (output_fcn * A).sum(dim = 0) / (A).sum(dim = 0)
-			#print(output_pool.size())
-			#print(output_pool)
-			output_pool = torch.clamp(output_pool, 1e-7, 1 - 1e-7)
-				
+		output_fcn = m_multiclass(logits)
 		return output_pool, output_fcn, A, features_to_return
 
 
