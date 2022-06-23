@@ -25,6 +25,7 @@ Six publicly available datasets are used for testing the CNNs:
 - [TCGA-COAD](https://portal.gdc.cancer.gov/projects/TCGA-COAD) 
 - [Xu](https://bmcbioinformatics.biomedcentral.com/articles/10.1186/s12859-017-1685-x) 
 - [AIDA](https://datahub.aida.scilifelab.se/10.23698/aida/drco) 
+- [IMP-CRC](https://www.nature.com/articles/s41598-021-93746-z#data-availability).
 
 ## Pre-Processing
 The WSIs are split in 224x224 pixels patches, from magnification 10x. 
@@ -43,6 +44,8 @@ CSV files are used as input for the scripts. The csvs have the following structu
 ## Training
 Script to train the CNN at WSI-level, using an instance-based MIL CNN:
 - python train.py -c resnet34 -b 512 -p att -e 10 -t multilabel -f True -i /PATH/WHERE/TO/FIND/THE/CSVS/INCLUDING/THE/PARTITIONS -o /PATH/WHERE/TO/SAVE/THE/MODEL/WEIGHTS -w /PATH/WHERE/TO/FIND/THE/PATCHES
+
+Script to pre-train the CNN using MoCo: python train_MoCo_HE_adversarial_loss.py -c resnet34 -b 512 -p att -e 10 -t multilabel -f True -l 0.001 -i /PATH/WHERE/TO/FIND/THE/CSVS/INCLUDING/THE/PARTITIONS -o /PATH/WHERE/TO/SAVE/THE/MODEL/WEIGHTS -w /PATH/WHERE/TO/FIND/THE/PATCHES
 
 ## Testing
 ### WSI-level
