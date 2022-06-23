@@ -96,33 +96,105 @@ def select_parameters_colour():
 	val_min = -8
 	val_max = 8
 
+
 	p1 = np.random.uniform(hue_min,hue_max,1)
 	p2 = np.random.uniform(sat_min,sat_max,1)
 	p3 = np.random.uniform(val_min,val_max,1)
-	
+
 	return p1[0],p2[0],p3[0]
 
-def generate_transformer(prob = 0.5):
+def select_rgb_shift():
+	r_min = -10
+	r_max = 10
+
+	g_min = -10
+	g_max = 10
+
+	b_min = -10
+	b_max = 10
+
+
+	p1 = np.random.uniform(r_min,r_max,1)
+	p2 = np.random.uniform(g_min,g_max,1)
+	p3 = np.random.uniform(b_min,b_max,1)
+
+	return p1[0],p2[0],p3[0]
+
+def select_elastic_distorsion():
+	sigma_min = 0
+	sigma_max = 20
+
+	alpha_affine_min = -20
+	alpha_affine_max = 20
+
+	p1 = np.random.uniform(sigma_min,sigma_max,1)
+	p2 = np.random.uniform(alpha_affine_min,alpha_affine_max,1)
+
+	return p1[0],p2[0]
+
+def select_grid_distorsion():
+	dist_min = 0
+	dist_max = 0.2
+
+	p1 = np.random.uniform(dist_min,dist_max,1)
+
+	return p1[0]
+
+def generate_transformer(label, prob = 0.5):
 	list_operations = []
-	probas = np.random.rand(4)
-	
+	probas = np.random.rand(7)
+
 	if (probas[0]>prob):
 		#print("VerticalFlip")
 		list_operations.append(A.VerticalFlip(always_apply=True))
 	if (probas[1]>prob):
 		#print("HorizontalFlip")
 		list_operations.append(A.HorizontalFlip(always_apply=True))
+	#"""
+	if (probas[2]>prob):
+		#print("RandomRotate90")
+		#list_operations.append(A.RandomRotate90(always_apply=True))
+
+		p_rot = np.random.rand(1)[0]
+		if (p_rot<=0.33):
+			lim_rot = 90
+		elif (p_rot>0.33 and p_rot<=0.66):
+			lim_rot = 180
+		else:
+			lim_rot = 270
+		list_operations.append(A.SafeRotate(always_apply=True, limit=(lim_rot,lim_rot+1e-4), interpolation=1, border_mode=4))
+	#"""
+	"""
 	if (probas[2]>prob):
 		#print("RandomRotate90")
 		list_operations.append(A.RandomRotate90(always_apply=True))
+	"""
 	if (probas[3]>prob):
 		#print("HueSaturationValue")
 		p1, p2, p3 = select_parameters_colour()
-		#list_operations.append(A.HueSaturationValue(always_apply=True,hue_shift_limit=(p1,p1+1e-4),sat_shift_limit=(p2,p2+1e-4),val_shift_limit=(p3,p3+1e-4)))
+		list_operations.append(A.HueSaturationValue(always_apply=True,hue_shift_limit=(p1,p1+1e-4),sat_shift_limit=(p2,p2+1e-4),val_shift_limit=(p3,p3+1e-4)))
 		
+		#print(p1,p2,p3)
+	"""
+	if (probas[4]>prob):
+		p1, p2, p3 = select_rgb_shift()
+		list_operations.append(A.RGBShift(r_shift_limit=(p1,p1+1e-4), g_shift_limit=(p2,p2+1e-4), b_shift_limit=(p3,p3+1e-4), always_apply=True))
+		#print(p1,p2,p3)
+	"""
+
+	if (np.array_equal(label,np.array([1,0,0,0,0])) or np.array_equal(label,np.array([0,1,0,0,0])) or np.array_equal(label,np.array([0,0,0,1,0])) or np.array_equal(label,np.array([1,1,0,0,0]))):
+
+		if (probas[5]>prob):
+			p1, p2 = select_elastic_distorsion()
+			list_operations.append(A.ElasticTransform(alpha=1,border_mode=4, sigma=p1, alpha_affine=p2,always_apply=True))
+			#print(p1,p2)
+		if (probas[6]>prob):
+			p1 = select_grid_distorsion()
+			list_operations.append(A.GridDistortion(num_steps=3, distort_limit=p1, interpolation=1, border_mode=4, always_apply=True))
+			#print(p1)
+	
 	pipeline_transform = A.Compose(list_operations)
 	return pipeline_transform
-
 
 def generate_list_instances(filename):
 
@@ -173,95 +245,69 @@ elif (TASK=='multilabel'):
 train_dataset = pd.read_csv(csv_filename_training, sep=',', header=None).values#[:10]
 valid_dataset = pd.read_csv(csv_filename_validation, sep=',', header=None).values#[:10]
 
-class ImbalancedDatasetSampler_multilabel(torch.utils.data.sampler.Sampler):
-	"""Samples elements randomly from a given list of indices for imbalanced dataset
-	Arguments:
-		indices (list, optional): a list of indices
-		num_samples (int, optional): number of samples to draw
-	"""
+class Balanced_Multimodal(torch.utils.data.sampler.Sampler):
 
-	def __init__(self, dataset, indices=None, num_samples=None):
-				
-		# if indices is not provided, 
-		# all elements in the dataset will be considered
-		self.indices = list(range(len(dataset)))             if indices is None else indices
-			
-		# if num_samples is not provided, 
-		# draw `len(indices)` samples in each iteration
-		self.num_samples = len(self.indices)             if num_samples is None else num_samples
-		
-		# distribution of classes in the dataset 
-		label_to_count = {}
-		for idx in self.indices:
-			label = self._get_label(dataset, idx)
-			for l in label:
-				if l in label_to_count:
-					label_to_count[l] += 1
-				else:
-					label_to_count[l] = 1
-	
-		# weight for each sample
-		weights = []
+    def __init__(self, dataset, indices=None, num_samples=None, alpha = 0.5):
 
-		for idx in self.indices:
-			c = 0
-			for l in self._get_label(dataset, idx):
-				c = c+(1/label_to_count[l])
-			weights.append(c)
-		self.weights = torch.DoubleTensor(weights)
+        self.indices = list(range(len(dataset)))             if indices is None else indices
 
-	def _get_label(self, dataset, idx):
-		labels = np.where(dataset[idx,1:]==1)[0]
-		#labels = dataset[idx,2]
-		return labels
-				
-	def __iter__(self):
-		return (self.indices[i] for i in torch.multinomial(
-			self.weights, self.num_samples, replacement=True))
+        self.num_samples = len(self.indices)             if num_samples is None else num_samples
 
-	def __len__(self):
-		return self.num_samples
+        class_sample_count = [0,0,0,0,0]
 
-class ImbalancedDatasetSampler_single_label(torch.utils.data.sampler.Sampler):
-	"""Samples elements randomly from a given list of indices for imbalanced dataset
-	Arguments:
-		indices (list, optional): a list of indices
-		num_samples (int, optional): number of samples to draw
-	"""
 
-	def __init__(self, dataset, indices=None, num_samples=None):
-				
-		# if indices is not provided, 
-		# all elements in the dataset will be considered
-		self.indices = list(range(len(dataset)))             if indices is None else indices
-			
-		# if num_samples is not provided, 
-		# draw `len(indices)` samples in each iteration
-		self.num_samples = len(self.indices)             if num_samples is None else num_samples
-			
-		# distribution of classes in the dataset 
-		label_to_count = {}
-		for idx in self.indices:
-			label = self._get_label(dataset, idx)
-			if label in label_to_count:
-				label_to_count[label] += 1
-			else:
-				label_to_count[label] = 1
-				
-		# weight for each sample
-		weights = [1.0 / label_to_count[self._get_label(dataset, idx)]
-				   for idx in self.indices]
-		self.weights = torch.DoubleTensor(weights)
+        class_sample_count = np.sum(train_dataset[:,1:],axis=0)
 
-	def _get_label(self, dataset, idx):
-		return dataset[idx,1]
-				
-	def __iter__(self):
-		return (self.indices[i] for i in torch.multinomial(
-			self.weights, self.num_samples, replacement=True))
+        min_class = np.argmin(class_sample_count)
+        class_sample_count = np.array(class_sample_count)
+        weights = []
+        for c in class_sample_count:
+            weights.append((c/class_sample_count[min_class]))
 
-	def __len__(self):
-		return self.num_samples
+        ratio = np.array(weights).astype(np.float)
+
+        label_to_count = {}
+        for idx in self.indices:
+            label = self._get_label(dataset, idx)
+            for l in label:
+                if l in label_to_count:
+                    label_to_count[l] += 1
+                else:
+                    label_to_count[l] = 1
+
+        weights = []
+
+        for idx in self.indices:
+            c = 0
+            for j, l in enumerate(self._get_label(dataset, idx)):
+                c = c+(1/label_to_count[l])#*ratio[l]
+
+            weights.append(c/(j+1))
+            #weights.append(c)
+            
+        self.weights_original = torch.DoubleTensor(weights)
+
+        self.weights_uniform = np.repeat(1/self.num_samples, self.num_samples)
+
+        #print(self.weights_a, self.weights_b)
+
+        beta = 1 - alpha
+        self.weights = (alpha * self.weights_original) + (beta * self.weights_uniform)
+
+
+    def _get_label(self, dataset, idx):
+        labels = np.where(dataset[idx,1:]==1)[0]
+        #print(labels)
+        #labels = dataset[idx,2]
+        return labels
+
+    def __iter__(self):
+        return (self.indices[i] for i in torch.multinomial(
+            self.weights, self.num_samples, replacement=True))
+
+    def __len__(self):
+        return self.num_samples
+
 
 #MODEL DEFINITION
 pre_trained_network = torch.hub.load('pytorch/vision:v0.4.2', CNN_TO_USE, pretrained=True)
@@ -338,7 +384,10 @@ class MIL_model(torch.nn.Module):
 				torch.nn.Tanh(),
 				torch.nn.Linear(self.D, self.K)
 			)
-	
+
+		self.tanh = torch.nn.Tanh()
+		self.relu = torch.nn.ReLU()
+
 	def forward(self, x, conv_layers_out, labels_wsi_np):
 		"""
 		In the forward function we accept a Tensor of input data and we must return
@@ -353,7 +402,8 @@ class MIL_model(torch.nn.Module):
 		dropout = torch.nn.Dropout(p=0.2)
 
 		self.labels = labels_wsi_np
-
+		
+		
 		if x is not None:
 			#print(x.shape)
 			conv_layers_out=self.conv_layers(x)
@@ -369,8 +419,13 @@ class MIL_model(torch.nn.Module):
 		#print(conv_layers_out.shape)
 
 		if (EMBEDDING_bool==True):
+			#conv_layers_out = self.tanh(conv_layers_out)
 			embedding_layer = self.embedding(conv_layers_out)
+			#embedding_layer = self.tanh(embedding_layer)
+			embedding_layer = self.relu(embedding_layer)
 			features_to_return = embedding_layer
+
+			#embedding_layer = self.tanh(embedding_layer)
 
 			embedding_layer = dropout(embedding_layer)
 			logits = self.embedding_fc(embedding_layer)
@@ -378,47 +433,30 @@ class MIL_model(torch.nn.Module):
 		else:
 			logits = self.fc(conv_layers_out)
 			features_to_return = conv_layers_out
-
 		#print(output_fcn.shape)
-		if (TASK=='binary' and N_CLASSES==1):
-			output_fcn = m_binary(logits)
-		else:
-			output_fcn = m_multiclass(logits)
+		
 
-		output_fcn = torch.clamp(output_fcn, 1e-7, 1 - 1e-7)
 		#print(output_fcn.size())
 
-		if (pool_algorithm=='max'):
-			output_pool = output_fcn.max(dim = 0)[0]
-		elif (pool_algorithm=='avg'):
-			output_pool = output_fcn.mean(dim = 0)
-			#print(output_pool.size())
-		elif (pool_algorithm=='lin'):
-			output_pool = (output_fcn * output_fcn).sum(dim = 0) / output_fcn.sum(dim = 0)
-			#print(output_pool.size())
-		elif (pool_algorithm=='exp'):
-			output_pool = (output_fcn * output_fcn.exp()).sum(dim = 0) / output_fcn.exp().sum(dim = 0)
-			#print(output_pool.size())
-		elif (pool_algorithm=='att'):
+		if (EMBEDDING_bool==True):
+			A = self.attention(features_to_return)
+		else:
+			A = self.attention(conv_layers_out)  # NxK
+			
+		#print(A.size())
+		#print(A)
+		A = F.softmax(A, dim=0)  # softmax over N
+		#print(A.size())
+		#print(A)
+		#A = A.view(-1, A.size()[0])
+		#print(A)
 
-			if (EMBEDDING_bool==True):
-				A = self.attention(features_to_return)
-			else:
-				A = self.attention(conv_layers_out)  # NxK
-				
-			#print(A.size())
-			#print(A)
-			A = F.softmax(A, dim=0)  # softmax over N
-			#print(A.size())
-			#print(A)
-			#A = A.view(-1, A.size()[0])
-			#print(A)
+		output_pool = (logits * A).sum(dim = 0) #/ (A).sum(dim = 0)
+		#print(output_pool.size())
+		#print(output_pool)
+		#output_pool = torch.clamp(output_pool, 1e-7, 1 - 1e-7)
 
-			output_pool = (output_fcn * A).sum(dim = 0) / (A).sum(dim = 0)
-			#print(output_pool.size())
-			#print(output_pool)
-			output_pool = torch.clamp(output_pool, 1e-7, 1 - 1e-7)
-				
+		output_fcn = m_multiclass(logits)
 		return output_pool, output_fcn, A, features_to_return
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -454,8 +492,8 @@ class Dataset_instance(data.Dataset):
 		# Select sample
 		ID = self.list_IDs[index][0]
 		# Load data and get label
-		X = Image.open(ID)
-		X = np.asarray(X)
+		img = Image.open(ID)
+		X = np.asarray(img)
 
 		if (self.set == 'train'):
 			#data augmentation
@@ -464,7 +502,7 @@ class Dataset_instance(data.Dataset):
 
 		#data transformation
 		input_tensor = preprocess(X).type(torch.FloatTensor)
-				
+		img.close()		
 		#return input_tensor
 		return input_tensor
 	
@@ -494,22 +532,12 @@ class Dataset_bag(data.Dataset):
 				
 		return instances_filename, y
 
-
-
 batch_size_bag = 1
 
-if (TASK=='binary' and N_CLASSES==1):
-	sampler = ImbalancedDatasetSampler_single_label
-	params_train_bag = {'batch_size': batch_size_bag,
-		  'sampler': sampler(train_dataset)}
-		  #'shuffle': True}
-
-
-elif (TASK=='multilabel'):
-	sampler = ImbalancedDatasetSampler_multilabel
-	params_train_bag = {'batch_size': batch_size_bag,
-		  'sampler': sampler(train_dataset)}
-		  #'shuffle': True}
+sampler = Balanced_Multimodal
+params_train_bag = {'batch_size': batch_size_bag_train,
+		'sampler': sampler(train_dataset,alpha=0.25)}
+		#'shuffle': True}
 
 params_valid_bag = {'batch_size': batch_size_bag,
 		  'shuffle': True}
@@ -547,24 +575,18 @@ import torch.optim as optim
 optimizer_str = 'adam'
 #optimizer_str = 'sgd'
 
-lr_str = '0.01'
-lr_str = '0.001'
-#lr_str = '0.0001'
-#lr_str = '0.00001'
+lr_str = '0.0001'
 
-wt_decay_str = '0.0'
-#wt_decay_str = '0.1'
-#wt_decay_str = '0.05'
-#wt_decay_str = '0.01'
-wt_decay_str = '0.001'
+wt_decay_str = '0.0001'
 
 lr = float(lr_str)
 wt_decay = float(wt_decay_str)
 
 if (optimizer_str == 'adam'):
-	optimizer = optim.Adam(model.parameters(),lr=lr, betas=(0.9, 0.999), eps=1e-08, weight_decay=wt_decay, amsgrad=False)
+	optimizer = optim.Adam(model.parameters(),lr=lr, betas=(0.9, 0.999), eps=1e-08, weight_decay=wt_decay, amsgrad=True)
 elif (optimizer_str == 'sgd'):
 	optimizer = optim.SGD(model.parameters(),lr=lr, momentum=0.9, weight_decay=wt_decay, nesterov=True)
+
 
 scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.1)
 
@@ -681,7 +703,8 @@ def evaluate_validation_set(model, epoch, generator):
 								
 				#loss.backward() 
 
-				outputs_wsi_np = predictions.cpu().data.numpy()
+				sigm_prediction = F.sigmoid(predictions)
+				outputs_wsi_np = sigm_prediction.cpu().data.numpy()
 
 				del probs, attn_layer, embeddings
 
@@ -877,15 +900,17 @@ while (epoch<num_epochs and early_stop_cont<EARLY_STOP_NUM):
 			loss = criterion_wsi(predictions, labels)
 			
 			loss.backward() 
+			optimizer.step()
+			model.zero_grad()
 
-			outputs_wsi_np = predictions.cpu().data.numpy()
+			sigm_prediction = F.sigmoid(predictions)
+			outputs_wsi_np = sigm_prediction.cpu().data.numpy()
 			
 
 			del probs, attn_layer, embeddings
 
 
-			optimizer.step()
-			#model.zero_grad()
+			
 
 			wsi_store_loss = wsi_store_loss + ((1 / (i+1)) * (loss.item() - wsi_store_loss))
 			
