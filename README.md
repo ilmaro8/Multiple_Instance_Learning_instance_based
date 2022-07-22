@@ -2,9 +2,9 @@
 Implementation of Multiple Instance Learning instance-based CNNs for histopathology images classification.
 
 ## Reference
-If you find this repository useful in your research, please cite: ...
+If you find this repository useful in your research, please cite: N.Marini et al. (2022). "Unleashing the potential of digital pathology data by training computer-aided diagnosis models without human annotations"
 
-Paper link: 
+Paper link: https://www.nature.com/articles/s41746-022-00635-4
 
 ## Requirements
 Python==3.6.9, albumentations==0.1.8, numpy==1.17.3, opencv==4.2.0, pandas==0.25.2, pillow==6.1.0, torchvision==0.8.1, pytorch==1.7.0
